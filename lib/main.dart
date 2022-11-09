@@ -1,25 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'firebase_options.dart';
+import 'package:flutter_apns_only/flutter_apns_only.dart';
 
-String? notifTitle, notifBody;
-
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  print("Handling a background message: ${message.messageId}");
-}
-
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  final connector = ApnsPushConnectorOnly();
+
+// onLaunch gets called, when you tap on notification on a closed app
+// onResume gets called, when you tap on notification with app in background
+// onMessage gets called, when a new notification is received
+
+  connector.configureApns(
+    onLaunch: (message) async {
+      print('Notification launched app');
+    },
+    onResume: (message) async {
+      print('Notification tapped when in the background');
+    },
+    onMessage: (message) async {
+      print('New notification received');
+    },
   );
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  runApp(MyApp());
+
+//Requesting user permissions
+  connector.requestNotificationPermissions();
+
+//Retreive and print device token
+
+  connector.token.addListener(() {
+    print('Token ${connector.token.value}');
+  });
+
+  connector.shouldPresent = (x) => Future.value(true);
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
@@ -33,31 +46,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    FirebaseMessaging.instance
-        .getToken()
-        .then((value) => {print("FCM Token Is: "), print(value)});
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got a message whilst in the foreground!');
-      print('Message data: ${message.data}');
-      if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification}');
-        setState(() {
-          notifTitle = message.notification!.title;
-          notifBody = message.notification!.body;
-        });
-      }
-    });
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Opened a notification');
-      print('Message data: ${message.data}');
-      if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification}');
-        setState(() {
-          notifTitle = message.notification!.title;
-          notifBody = message.notification!.body;
-        });
-      }
-    });
   }
 
   @override
@@ -67,27 +55,7 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: Text("Notifications App"),
         ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                "${notifTitle != null ? notifTitle : "Notification Title Goes Here"}",
-                style: TextStyle(
-                    fontSize: 28,
-                    color: Color.fromARGB(255, 79, 79, 79),
-                    fontWeight: FontWeight.bold),
-              ),
-              Text(
-                "${notifBody != null ? notifBody : "Notification Body Goes Here"}",
-                style: TextStyle(
-                    fontSize: 16,
-                    color: Color.fromARGB(255, 79, 79, 79),
-                    fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
+        body: Center(child: Text('Ready to receive notifcations?')),
       ),
     );
   }
